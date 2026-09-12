@@ -1,7 +1,7 @@
-# Vera Bot — Magicpin AI Merchant Assistant
+# Vera Bot — Deterministic Merchant Intelligence Engine
 
-> **Production-grade, deterministic AI decision engine** for the Magicpin Merchant AI Challenge.
-> Talks to merchants over WhatsApp. No LLM. Same input always produces same output.
+> **Production-ready decision system** built for the Magicpin Merchant AI Challenge.
+> Vera communicates with merchants through WhatsApp using a deterministic, rule-driven pipeline. No LLM calls, no randomness, and identical inputs lead to identical decisions.
 
 [![Node.js](https://img.shields.io/badge/Node.js-20%2B-green)](https://nodejs.org)
 [![Tests](https://img.shields.io/badge/tests-102%20passing-brightgreen)](#testing)
@@ -10,20 +10,29 @@
 
 ---
 
-## What Is This?
+## Overview
 
-This is **Vera** — an AI merchant assistant that engages ~10,000 merchants/day over WhatsApp. Vera:
+Vera is a merchant-facing assistant designed to proactively decide **what should be communicated, when it should be communicated, and when it should stay silent**.
 
-- Receives merchant context (performance data, offers, campaigns, customers)
-- Evaluates incoming triggers (festival events, performance drops, research digests)
-- Returns the single best proactive message for each merchant
-- Handles multi-turn conversations (YES/NO replies, follow-ups, graceful exits)
+The engine:
 
-**The core design principle**: every decision is deterministic. No randomness, no hallucination, no LLM calls. The same merchant context + trigger always produces the same output.
+- Maintains merchant, category, customer, and trigger context
+- Converts raw context into prioritized signals
+- Applies deterministic inference rules
+- Selects and ranks candidate strategies
+- Protects conversations from repetitive or unsafe replays
+- Produces one grounded action with an appropriate CTA
+- Supports multi-turn YES/NO replies and follow-ups
+
+The main principle is simple: **decision logic must be deterministic and explainable**. Given the same context and trigger, the system produces the same result.
+
 
 ---
 
-## Architecture Overview
+## System Architecture
+
+The service is an Express-based HTTP application with an in-memory memory layer and a deterministic decision engine. The judge interacts with four endpoints:
+
 
 ```
                          ┌─────────────────────────────────────────┐
@@ -74,7 +83,7 @@ FinalAction       ──  { message, strategy, cta, confidence, merchant_state, 
 
 ---
 
-## Project Structure
+## Repository Layout
 
 ```
 vera-bot/
@@ -162,9 +171,9 @@ vera-bot/
 
 ---
 
-## Decision Pipeline
+## How Decisions Are Made
 
-Every `/v1/tick` and `/v1/reply` call runs through the same 8-step pipeline:
+Both `/v1/tick` and `/v1/reply` pass through the same eight-stage decision flow:
 
 | Step | Module | What it does |
 |------|--------|--------------|
@@ -179,9 +188,9 @@ Every `/v1/tick` and `/v1/reply` call runs through the same 8-step pipeline:
 
 ---
 
-## Memory Model
+## Memory & Context
 
-4 types of context, stored in separate `Map`s inside `MemoryStore`:
+Vera keeps four context scopes in separate JavaScript `Map` structures inside `MemoryStore`:
 
 | Context Type | Store Key | Example |
 |---|---|---|
@@ -196,7 +205,7 @@ Every `/v1/tick` and `/v1/reply` call runs through the same 8-step pipeline:
 
 ---
 
-## State Machine
+## Merchant State Flow
 
 Merchants progress through deterministic states based on real signals:
 
@@ -215,9 +224,9 @@ State drives strategy scoring — a `DECLINING` merchant gets higher scores for 
 
 ---
 
-## Strategy Engine
+## Strategy Selection
 
-10 strategies, each independently scoring and composing:
+Ten strategy modules independently calculate relevance and can compose the final message:
 
 | Strategy | Primary Signal | Score Range |
 |---|---|---|
@@ -249,7 +258,7 @@ ActionRanker scoring dimensions (total = 1.0):
 
 ---
 
-## Replay Protection
+## Replay & Suppression
 
 6 suppression rules, evaluated in order before any message is sent:
 
@@ -271,10 +280,28 @@ ReplayGuard (runs before strategy selection):
 
 ---
 
-## API Documentation
+## Quick Start
+
+```bash
+npm install
+cp .env.example .env
+npm start
+```
+
+For development:
+
+```bash
+npm run dev
+```
+
+The default HTTP port is `3000`.
+
+---
+
+## HTTP API
 
 ### `POST /v1/context`
-Receive a context push from the judge.
+Accept a versioned context update from the judge.
 
 **Request:**
 ```json
@@ -294,7 +321,7 @@ Receive a context push from the judge.
 ---
 
 ### `POST /v1/tick`
-Periodic wake-up. Bot decides what to send proactively.
+Wake the engine and evaluate whether proactive messages should be sent.
 
 **Request:** `{ "now": "2026-04-26T10:30:00Z", "available_triggers": ["trg_001", "trg_002"] }`
 
@@ -303,7 +330,7 @@ Periodic wake-up. Bot decides what to send proactively.
 ---
 
 ### `POST /v1/reply`
-Receive a merchant reply. Bot responds synchronously within 30s.
+Process an incoming merchant response and return the next action synchronously.
 
 **Request:** `{ "conversation_id": "conv_001", "from_role": "merchant", "message": "Yes", "turn_number": 2 }`
 
@@ -312,20 +339,20 @@ Receive a merchant reply. Bot responds synchronously within 30s.
 ---
 
 ### `GET /v1/healthz`
-Liveness probe. Polled every 60s by the judge.
+Lightweight liveness endpoint used by the judge.
 
 **Response 200:** `{ "status": "ok", "uptime_seconds": 3600, "contexts_loaded": { "category": 5, "merchant": 50, "customer": 200, "trigger": 100 } }`
 
 ---
 
 ### `GET /v1/metadata`
-Bot identity.
+Returns the bot's identity and version information.
 
 **Response 200:** `{ "team_name": "...", "model": "vera-deterministic-engine-v1", "approach": "...", "version": "1.0.0" }`
 
 ---
 
-## Environment Variables
+## Configuration
 
 | Variable | Default | Description |
 |---|---|---|
@@ -344,7 +371,7 @@ Bot identity.
 
 ---
 
-## Testing
+## Verification & Tests
 
 ```bash
 # Run all 102 tests
@@ -370,7 +397,7 @@ Test coverage spans:
 
 ---
 
-## Deployment
+## Running & Deployment
 
 ### Docker (recommended for local judge simulator)
 
@@ -411,7 +438,7 @@ npm run dev            # Development (hot-reload)
 
 ---
 
-## Performance
+## Performance Characteristics
 
 | Endpoint | p50 | p95 | p99 |
 |---|---|---|---|
@@ -431,20 +458,20 @@ Key performance decisions:
 
 ---
 
-## Trade-offs
+## Design Trade-offs
 
 | Decision | Why | Trade-off |
 |---|---|---|
-| **No LLM** | Deterministic, fast, no API cost, no hallucination | Lower linguistic creativity vs GPT-4 |
-| **In-memory storage** | Zero latency, no network hop | State lost on restart (acceptable for judge) |
-| **10 strategy classes** | Modular, testable, extensible | More code vs a monolithic if-else tree |
-| **Weighted ranker** | Explains every decision, auditable | Weights require tuning per domain |
+| **Deterministic engine** | Predictable output, low latency, no API dependency or hallucination | Less language variety than an LLM |
+| **In-memory state** | Very fast reads and writes, no database round-trip | State disappears after a restart |
+| **Separate strategy modules** | Easier testing, extension, and ownership | More files than a single conditional tree |
+| **Weighted action ranking** | Makes selection explicit and auditable | Scores and weights need tuning |
 | **Maps over objects** | O(1) lookup, iterable, no prototype pollution | Slightly more verbose API |
 | **Singleton exports** | Zero allocation per request | Not thread-safe (Node.js is single-threaded — fine) |
 
 ---
 
-## Future Improvements
+## Possible Extensions
 
 1. **Persistent memory** — Redis or SQLite for state survival across restarts
 2. **A/B ranking** — test weight configurations against judge score to auto-tune ranker
@@ -452,3 +479,9 @@ Key performance decisions:
 4. **Customer-facing pipeline** — full `send_as: merchant_on_behalf` path for customer messages
 5. **LLM hybrid** — use deterministic engine for strategy selection + LLM for final message polish
 6. **Real-time dashboard** — merchant state heatmap + decision trace visualisation
+
+---
+
+## Summary
+
+Vera is intentionally built around **predictability, traceability, and fast decision-making**. Instead of asking an LLM to decide what to do, the system extracts signals, derives observations, scores strategies, applies replay protection, and returns one structured action. This makes the behavior easier to test, explain, and reproduce.
